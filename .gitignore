@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+
+# uv
+.uv/
+
+# Node
+node_modules/
+.dist
+.yarn/
+
+# Vite
+frontend/dist/
+
+# Environment
+.env
+.env.*
+
+# Docker
+volumes/
+
+# Editors
+.vscode/
+.idea/
+.DS_Store
