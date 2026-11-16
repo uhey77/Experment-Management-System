@@ -25,18 +25,24 @@ def _generate_unique_slug(session: Session, base_slug: str) -> str:
     slug_candidate = cleaned_slug
     suffix = 1
 
-    existing = session.exec(
-        select(Experiment.id).where(Experiment.slug == slug_candidate)
-    ).scalar_one_or_none()
-
-    while existing is not None:
+    while _slug_exists(session, slug_candidate):
         slug_candidate = f"{cleaned_slug}-{suffix}"
         suffix += 1
-        existing = session.exec(
-            select(Experiment.id).where(Experiment.slug == slug_candidate)
-        ).scalar_one_or_none()
 
     return slug_candidate
+
+
+def _slug_exists(session: Session, slug: str) -> bool:
+    statement = select(Experiment.id).where(Experiment.slug == slug)
+    return session.exec(statement).scalar_one_or_none() is not None
+
+
+def _get_or_404(session: Session, experiment_id: int) -> Experiment:
+    """実験を取得する。存在しなければ 404 を返す。"""
+    experiment = session.get(Experiment, experiment_id)
+    if not experiment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Experiment not found")
+    return experiment
 
 
 @router.post("/", response_model=ExperimentRead, status_code=status.HTTP_201_CREATED)
@@ -90,9 +96,7 @@ def list_experiments(
 
 @router.get("/{experiment_id}", response_model=ExperimentRead)
 def get_experiment(*, session: SessionDep, experiment_id: int) -> Experiment:
-    experiment = session.get(Experiment, experiment_id)
-    if not experiment:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Experiment not found")
+    experiment = _get_or_404(session, experiment_id)
     return ExperimentRead.model_validate(experiment)
 
 
@@ -103,9 +107,7 @@ def update_experiment(
     experiment_id: int,
     experiment_in: ExperimentUpdate,
 ) -> Experiment:
-    experiment = session.get(Experiment, experiment_id)
-    if not experiment:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Experiment not found")
+    experiment = _get_or_404(session, experiment_id)
 
     update_data = experiment_in.model_dump(exclude_unset=True)
     if "title" in update_data and update_data["title"]:
@@ -124,9 +126,7 @@ def update_experiment(
 
 @router.delete("/{experiment_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_experiment(*, session: SessionDep, experiment_id: int) -> None:
-    experiment = session.get(Experiment, experiment_id)
-    if not experiment:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Experiment not found")
+    experiment = _get_or_404(session, experiment_id)
 
     session.delete(experiment)
     session.commit()
